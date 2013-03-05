@@ -14,7 +14,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Test program for displaying gabors on images.")
     parser.add_argument("-save", action="store_true", dest="save", help="Enables saving of the image to the ./output/ folder.")
-    parser.add_argument("-mouse", action="store_true", dest="mouse", help="If set, the gabor will follow the mouse cursor.")
+    parser.add_argument("-nomouse", action="store_true", dest="nomouse", help="If set, the gabor will be centered instead of following the mouse cursor.")
     parser.add_argument("-nobox", action="store_true", dest="nobox", help="If set, the saved output will not be outlined by a box.")
     parser.add_argument("source", metavar="SourceImage", help="The image to be modulated.")
     
@@ -26,12 +26,12 @@ if __name__ == "__main__":
     
     pygame.init()
     
-    resolution = (1024, 768) 
+    resolution = [1024, 768]
     midpoint = [x/2.0 for x in resolution]
     size = (36.0, 27.0)
     vdist = 61.0
     
-    screen = pygame.display.set_mode(resolution, pygame.DOUBLEBUF | pygame.HWSURFACE)
+    screen = pygame.display.set_mode(tuple(resolution), pygame.DOUBLEBUF | pygame.HWSURFACE)
     
     vis_data = VIS_DATA._make([resolution, midpoint, size, vdist])
     
@@ -52,9 +52,9 @@ if __name__ == "__main__":
     
     running = True
     while running:
-        position = (resolution[0] / 2, resolution[1] / 2)
+        position = [r / 2 for r in resolution]
         
-        if args.mouse:
+        if not args.nomouse:
             position = pygame.mouse.get_pos()
             
             position = (
