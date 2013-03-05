@@ -22,14 +22,18 @@ if __name__ == "__main__":
     parser.add_argument("-sf", dest="sf", default=2, type=float, help="Spacial frequency of the patch in cycles per degree. Defaults to 0.2.")
     parser.add_argument("-rot", dest="rot", default=45, type=float, help="Orientation of the patch in degrees. Defaults to 45.")
     
+    parser.add_argument("-r", "-resolution", dest="resolution", default=[1024, 768], nargs=2, help="Size of the image and screen. Defaults to 1024x768. Image will be resized to fit.")
+    parser.add_argument("-s", "-size", dest="size", default=[36.0, 27.0], nargs=2, help="Size of the physical screen in inches. Defaults to 36x27.")
+    parser.add_argument("-v", "-vdist", dest="vdist", default=61, help="Distance from the screen of the user. Defaults to 61in.")
+    
     args = parser.parse_args()
     
     pygame.init()
     
-    resolution = [1024, 768]
+    resolution = args.resolution
     midpoint = [x/2.0 for x in resolution]
-    size = (36.0, 27.0)
-    vdist = 61.0
+    size = args.size
+    vdist = args.vdist
     
     screen = pygame.display.set_mode(tuple(resolution), pygame.DOUBLEBUF | pygame.HWSURFACE)
     
