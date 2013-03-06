@@ -3,15 +3,13 @@
 import math
 import os
 import sys
-from psychopy import misc
 import numpy
 import pygame
 import time
 import argparse
 from gabor_util import *
 
-if __name__ == "__main__":
-    
+def main():
     parser = argparse.ArgumentParser(description="Test program for displaying gabors on images.")
     parser.add_argument("-save", action="store_true", dest="save", help="Enables saving of the image to the ./output/ folder.")
     parser.add_argument("-nomouse", action="store_true", dest="nomouse", help="If set, the gabor will be centered instead of following the mouse cursor.")
@@ -83,8 +81,8 @@ if __name__ == "__main__":
         screen.blit(store, gabor.position)
         
         clock.tick()
-        print "fps = " + str(clock.get_fps())
-         
+        sys.stdout.write("\rfps = " + str(clock.get_fps()))
+        sys.stdout.flush()
         for evt in pygame.event.get():
             if evt.type == pygame.QUIT:
                     running = False
@@ -92,7 +90,7 @@ if __name__ == "__main__":
                     pressed_key = evt.key
                     
                     if pressed_key == 27:
-                        exit()
+                        running = False
                     if pressed_key == pygame.K_SPACE:
                         running = False
                     if pressed_key == pygame.K_r:
@@ -103,4 +101,7 @@ if __name__ == "__main__":
                         args.rot -= 5
                         spacials = SPATIAL_DATA._make([args.ecc, args.sf, args.rot])
                         freqs = load_spacial_data(vis_data, spacials)
-                        
+                       
+if __name__ == "__main__":
+    main()
+    print "\n"
