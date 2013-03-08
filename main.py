@@ -16,6 +16,8 @@ def main():
     parser.add_argument("-nobox", action="store_true", dest="nobox", help="If set, the saved output will not be outlined by a box.")
     parser.add_argument("source", metavar="SourceImage", help="The image to be modulated.")
     
+    parser.add_argument("-no_filter", action="store_true", dest="is_rms", help="If set, the displayed image will not have the RMS contrast filter applied to it.")
+
     parser.add_argument("-ecc", dest="ecc", default=3, type=int, help="Size of the patch in degrees of visual angle. Defaults to 3.")
     parser.add_argument("-sf", dest="sf", default=2, type=float, help="Spacial frequency of the patch in cycles per degree. Defaults to 0.2.")
     parser.add_argument("-rot", dest="rot", default=45, type=float, help="Orientation of the patch in degrees. Defaults to 45.")
@@ -44,10 +46,14 @@ def main():
     
     spacials = SPATIAL_DATA._make([args.ecc, args.sf, args.rot])
     freqs = load_spacial_data(vis_data, spacials)
-    store = pygame.Surface((freqs.gabor_diameter, freqs.gabor_diameter))
+    stores = [pygame.Surface((freqs.gabor_diameter, freqs.gabor_diameter)) for i in range(0, 4)]
     
+    spread = 100
+
+    store_array = zip(stores, [0, 0, spread, -spread], [-spread, spread, 0, 0])
+
     clock = pygame.time.Clock()
-    gabor_def = load_matrices(args.source, resolution)
+    gabor_def = load_matrices(args.source, resolution, is_rms=args.is_rms)
 
     pygame.surfarray.blit_array(screen, gabor_def.rms_matrix)
     pygame.display.flip()
@@ -60,14 +66,17 @@ def main():
             position = pygame.mouse.get_pos()
             
             position = (
-                max(min(position[0], resolution[0] - freqs.gabor_diameter/2), freqs.gabor_diameter/2),
-                max(min(position[1], resolution[1] - freqs.gabor_diameter/2), freqs.gabor_diameter/2)
+                max(min(position[0], resolution[0] - (freqs.gabor_diameter/2 + spread)), (freqs.gabor_diameter/2 + spread)),
+                max(min(position[1], resolution[1] - (freqs.gabor_diameter/2 + spread)), (freqs.gabor_diameter/2 + spread))
             )
-        
-        gabor = modulate_image(gabor_def, vis_data, spacials, position=position, frequency_data=freqs)
-        
-        pygame.surfarray.blit_array(store, gabor.new_patch)
-        screen.blit(store, gabor.position)
+        old_gabor_positions = []
+        for store, dx, dy in store_array:
+            local_pos = (position[0] + dx, position[1] + dy)
+            gabor = modulate_image(gabor_def, vis_data, spacials, position=local_pos, frequency_data=freqs)
+            pygame.surfarray.blit_array(store, gabor.new_patch)
+            screen.blit(store, gabor.position)
+            pygame.surfarray.blit_array(store, gabor.old_patch)
+            old_gabor_positions.append(gabor.position)
         
         if args.save:
             mat = gabor_def.rms_matrix.copy()
@@ -77,11 +86,12 @@ def main():
             pygame.image.save(image_out, './output/{4}_ecc{0}-sf{1}-size{2}-rot{3}.jpg'.format(ecc, sf, size_of_gabor, rot, args.source.split('.')[0].split('/')[-1]))
             
         pygame.display.flip()
-        pygame.surfarray.blit_array(store, gabor.old_patch)
-        screen.blit(store, gabor.position)
+        
+        for (store, dx, dy), pos in zip(store_array, old_gabor_positions):
+            screen.blit(store, pos)
         
         clock.tick()
-        sys.stdout.write("\rfps = " + str(clock.get_fps()))
+        sys.stdout.write("fps = " + str(clock.get_fps()) + '\n')
         sys.stdout.flush()
         for evt in pygame.event.get():
             if evt.type == pygame.QUIT:
