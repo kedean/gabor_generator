@@ -90,7 +90,7 @@ def main():
         for (store, dx, dy), pos in zip(store_array, old_gabor_positions):
             screen.blit(store, pos)
         
-        clock.tick()
+        clock.tick(60)
         sys.stdout.write("fps = " + str(clock.get_fps()) + '\n')
         sys.stdout.flush()
         for evt in pygame.event.get():
