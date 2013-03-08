@@ -26,6 +26,8 @@ def main():
     parser.add_argument("-s", "-size", dest="size", default=[36.0, 27.0], nargs=2, help="Size of the physical screen in inches. Defaults to 36x27.")
     parser.add_argument("-v", "-vdist", dest="vdist", default=61, help="Distance from the screen of the user. Defaults to 61in.")
     
+    parser.add_argument("-f", "-fullscreen", dest="fullscreen", action="store_true", help="Start the program in fullscreen mode.")
+
     args = parser.parse_args()
     
     pygame.init()
@@ -35,7 +37,11 @@ def main():
     size = args.size
     vdist = args.vdist
     
-    screen = pygame.display.set_mode(tuple(resolution), pygame.DOUBLEBUF | pygame.HWSURFACE)
+    screen = None
+    if args.fullscreen:
+        screen = pygame.display.set_mode(tuple(resolution), pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.FULLSCREEN)
+    else:
+        screen = pygame.display.set_mode(tuple(resolution), pygame.DOUBLEBUF | pygame.HWSURFACE)
     
     vis_data = VIS_DATA._make([resolution, midpoint, size, vdist])
     
@@ -90,7 +96,7 @@ def main():
         for (store, dx, dy), pos in zip(store_array, old_gabor_positions):
             screen.blit(store, pos)
         
-        clock.tick(60)
+        clock.tick()
         sys.stdout.write("fps = " + str(clock.get_fps()) + '\n')
         sys.stdout.flush()
         for evt in pygame.event.get():
