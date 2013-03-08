@@ -74,18 +74,19 @@ def color_rms(image, rms):
 from collections import namedtuple
 VIS_DATA = namedtuple("VisData", ['resolution', 'midpoint', 'size', 'vdist'], verbose=False, rename=False)
 SPATIAL_DATA = namedtuple("SpacialData", ['ecc', 'sf', 'rot'])
-FREQ_DATA = namedtuple("FreqData", ['pixels_per_degree', 'gabor_diameter', 'xf', 'yf', 'guassian', 'ramp', 'grating'])
+FREQ_DATA = namedtuple("FreqData", ['pixels_per_degree', 'gabor_diameter', 'xf', 'yf', 'guassian', 'ramp', 'grating', 'g'])
 
-GABOR_DEF = namedtuple("GaborDef", ['original', 'matrix', 'rms_matrix'])
+GABOR_DEF = namedtuple("GaborDef", ['original', 'matrix', 'rms_matrix', 'avg_matrix'])
 
 GABOR_DATA = namedtuple("GaborData", ['position', 'size', 'radius', 'old_patch', 'new_patch'])
 
-def load_matrices(source, resolution=(1024, 768)):
+def load_matrices(source, resolution=(1024, 768), is_rms=False):
     s_image_original = pygame.image.load(source)
     s_image_original = pygame.transform.smoothscale(s_image_original, resolution)
     s_image_mat = pygame.surfarray.array3d(s_image_original)
-    s_image_rms_mat = color_rms(s_image_mat, 0.2)
-    return GABOR_DEF._make([s_image_original, s_image_mat, s_image_rms_mat])
+    s_image_rms_mat = s_image_mat.copy() if is_rms else color_rms(s_image_mat, 0.2)
+    s_avg_mat = numpy.mean(s_image_rms_mat, axis=2)
+    return GABOR_DEF._make([s_image_original, s_image_mat, s_image_rms_mat, s_avg_mat])
 
 def load_spacial_data(
     (resolution, midpoint, size, vdist),
@@ -114,7 +115,9 @@ def load_spacial_data(
     ramp = numpy.sin(orientation * math.pi/180.0) * xf - numpy.cos(orientation * math.pi / 180.0) * yf
     grating = numpy.sin(2.0 * math.pi * sf * ramp)
     
-    return FREQ_DATA._make([pixels_per_degree, gabor_diameter, xf, yf, gaussian, ramp, grating])
+    g = mat2gray(grating * gaussian)
+
+    return FREQ_DATA._make([pixels_per_degree, gabor_diameter, xf, yf, gaussian, ramp, grating, g])
 
 def modulate_image(gabor_def,
                     visuals,
@@ -123,25 +126,34 @@ def modulate_image(gabor_def,
                     min_contrast=0.0,
                     frequency_data=None):
     
-    (pixels_per_degree, gabor_diameter, xf, yf, gaussian, ramp, grating) = frequency_data if isinstance(frequency_data, FREQ_DATA) else load_spacial_data(visuals, spacials)
+    (pixels_per_degree, gabor_diameter, xf, yf, gaussian, ramp, grating, g) = frequency_data if isinstance(frequency_data, FREQ_DATA) else load_spacial_data(visuals, spacials)
     
     top_left_pos = (position[0] - (gabor_diameter / 2.0), position[1] - (gabor_diameter / 2.0))
-
+    #import time
+    #print " "
+    #s = time.time()
     patch = gabor_def.rms_matrix[top_left_pos[0] : top_left_pos[0] + gabor_diameter, top_left_pos[1] : top_left_pos[1] + gabor_diameter, :]
-    patch_avg = numpy.mean(patch, axis=2)
+    #print "a " + str((time.time() - s) * 1000.0)
+    #s = time.time()
     
+    patch_avg = gabor_def.avg_matrix[top_left_pos[0] : top_left_pos[0] + gabor_diameter, top_left_pos[1] : top_left_pos[1] + gabor_diameter]
+    #patch_avg = numpy.mean(patch, axis=2)
+    #print "x = {0}".format(patch_avg)
+    #patch_avg = patch[:,:,1]
+    #print "b " + str((time.time() - s) * 1000.0)
+    #s = time.time()
     R = (patch_avg / 127.0) - 1
     R = R / (numpy.max(numpy.abs(R))) / 2.0
+    #print "c " + str((time.time() - s) * 1000.0)
+    #s = time.time()
     rms_measure = numpy.std(R + 0.5) / numpy.mean(R + 0.5)
     if min_contrast > 0:
         rms_measure = max(rms_measure, min_contrast)
-    
-    g = mat2gray(grating * gaussian)
+    #print "d " + str((time.time() - s) * 1000.0)
     g = g * (255.0 * rms_measure)
     g = g - numpy.mean(g)
     
-    gabor = numpy.tile(g, (3,1,1))
-    gabor = numpy.transpose(gabor, (1,2,0))
+    gabor = numpy.transpose(numpy.tile(g, (3,1,1)), (1,2,0))
     
     return GABOR_DATA._make([top_left_pos, gabor_diameter, gabor_diameter / 2.0, patch, numpy.clip(patch + gabor, 0, 255).astype('uint8')])
     
