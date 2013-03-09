@@ -22,6 +22,9 @@ def main():
     parser.add_argument("-sf", dest="sf", default=2, type=float, help="Spacial frequency of the patch in cycles per degree. Defaults to 0.2.")
     parser.add_argument("-rot", dest="rot", default=45, type=float, help="Orientation of the patch in degrees. Defaults to 45.")
     
+    parser.add_argument("-grouprot", dest="grouprot", default=0, type=float, help="Orientation of patch group about the cursor location. Defaults to 0.")
+    parser.add_argument("-grouprot_rand", dest="grouprot_rand", action="store_true", help="If set, the patches will be oriented randomly about the cursor.")
+
     parser.add_argument("-r", "-resolution", dest="resolution", default=[1024, 768], nargs=2, help="Size of the image and screen. Defaults to 1024x768. Image will be resized to fit.")
     parser.add_argument("-s", "-size", dest="size", default=[36.0, 27.0], nargs=2, help="Size of the physical screen in inches. Defaults to 36x27.")
     parser.add_argument("-v", "-vdist", dest="vdist", default=61, help="Distance from the screen of the user. Defaults to 61in.")
@@ -55,6 +58,12 @@ def main():
     stores = [pygame.Surface((freqs.gabor_diameter, freqs.gabor_diameter)) for i in range(0, 4)]
     
     spread = 100
+    if args.grouprot_rand:
+        args.grouprot = numpy.random.random() * (math.pi / 4.0)
+        print args.grouprot
+    else:
+        args.grouprot = math.radians(args.grouprot)
+    group_formula = (math.sin(args.grouprot), math.cos(args.grouprot))
 
     store_array = zip(stores, [0, 0, spread, -spread], [-spread, spread, 0, 0])
 
@@ -77,7 +86,9 @@ def main():
             )
         old_gabor_positions = []
         for store, dx, dy in store_array:
-            local_pos = (position[0] + dx, position[1] + dy)
+            ddx = dx*group_formula[1] - dy*group_formula[0]
+            ddy = dx*group_formula[0] + dy*group_formula[1]
+            local_pos = (position[0] + ddx, position[1] + ddy)
             gabor = modulate_image(gabor_def, vis_data, spacials, position=local_pos, frequency_data=freqs)
             pygame.surfarray.blit_array(store, gabor.new_patch)
             screen.blit(store, gabor.position)
@@ -97,7 +108,7 @@ def main():
             screen.blit(store, pos)
         
         clock.tick()
-        sys.stdout.write("fps = " + str(clock.get_fps()) + '\n')
+        sys.stdout.write("\rfps = " + str(clock.get_fps()))
         sys.stdout.flush()
         for evt in pygame.event.get():
             if evt.type == pygame.QUIT:
@@ -105,7 +116,7 @@ def main():
             elif evt.type == pygame.KEYDOWN:
                     pressed_key = evt.key
                     
-                    if pressed_key == 27:
+                    if pressed_key == pygame.K_ESCAPE:
                         running = False
                     if pressed_key == pygame.K_SPACE:
                         running = False
@@ -120,4 +131,4 @@ def main():
                        
 if __name__ == "__main__":
     main()
-    print "\n"
+    print ""
