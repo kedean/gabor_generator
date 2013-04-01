@@ -7,6 +7,7 @@ import numpy
 import pygame
 import time
 import argparse
+import Tkinter, tkFileDialog
 from gabor_util import *
 
 def main():
@@ -14,7 +15,7 @@ def main():
     parser.add_argument("-save", action="store_true", dest="save", help="Enables saving of the image to the ./output/ folder.")
     parser.add_argument("-nomouse", action="store_true", dest="nomouse", help="If set, the gabor will be centered instead of following the mouse cursor.")
     parser.add_argument("-nobox", action="store_true", dest="nobox", help="If set, the saved output will not be outlined by a box.")
-    parser.add_argument("source", metavar="SourceImage", help="The image to be modulated.")
+    parser.add_argument("-source", metavar="SourceImage", default="", help="The image to be modulated.")
     
     parser.add_argument("-no_filter", action="store_true", dest="is_rms", help="If set, the displayed image will not have the RMS contrast filter applied to it.")
 
@@ -32,6 +33,12 @@ def main():
     parser.add_argument("-f", "-fullscreen", dest="fullscreen", action="store_true", help="Start the program in fullscreen mode.")
 
     args = parser.parse_args()
+    
+    if len(args.source) < 1:
+        root = Tkinter.Tk()
+        root.withdraw()
+        args.source = tkFileDialog.askopenfilename(parent=root, initialdir="./", title="Please select an image to modulate.")
+        root.destroy()
     
     pygame.init()
     
