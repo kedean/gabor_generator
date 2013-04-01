@@ -16,10 +16,10 @@ if os.path.exists(args.dest) == False:
     try:
         os.mkdir(args.dest)
     except:
-        print "Could not create destination directory."
+        print "Could not create destination directory '%s'.".format(args.dest)
         exit()
 if os.path.exists(args.source) == False:
-    print "Source directory does not exist."
+    print "Source directory '%s' does not exist.".format(args.source)
     exit()
 
 for filename in os.listdir("./image_set"):
@@ -29,7 +29,7 @@ for filename in os.listdir("./image_set"):
     out_filename = "{0}/{1}".format(args.dest, filename)
     
     if args.verbose:
-        print "Converting {0}".format(filename)
+        print "Converting {0} into {1}".format(os.path.join(args.source, filename), os.path.join(args.dest, filename))
 
     orig = Image.open(in_filename)
     as_mat = numpy.array(orig)
