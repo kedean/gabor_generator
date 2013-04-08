@@ -16,6 +16,7 @@ def main():
     parser.add_argument("-nomouse", action="store_true", dest="nomouse", help="If set, the gabor will be centered instead of following the mouse cursor.")
     parser.add_argument("-nobox", action="store_true", dest="nobox", help="If set, the saved output will not be outlined by a box.")
     parser.add_argument("-source", metavar="SourceImage", default="", help="The image to be modulated.")
+    parser.add_argument("-localrms", action="store_true", dest="localrms", help="If set, each patch will use the average of its area, otherwise the overall image rms is used.")
     
     parser.add_argument("-no_filter", action="store_true", dest="is_rms", help="If set, the displayed image will not have the RMS contrast filter applied to it.")
 
@@ -96,7 +97,7 @@ def main():
             ddx = dx*group_formula[1] - dy*group_formula[0]
             ddy = dx*group_formula[0] + dy*group_formula[1]
             local_pos = (position[0] + ddx, position[1] + ddy)
-            gabor = modulate_image(gabor_def, vis_data, spacials, position=local_pos, frequency_data=freqs)
+            gabor = modulate_image(gabor_def, vis_data, spacials, position=local_pos, frequency_data=freqs, use_local_rms=args.localrms)
             pygame.surfarray.blit_array(store, gabor.new_patch)
             screen.blit(store, gabor.position)
             pygame.surfarray.blit_array(store, gabor.old_patch)

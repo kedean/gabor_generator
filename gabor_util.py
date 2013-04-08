@@ -76,7 +76,7 @@ VIS_DATA = namedtuple("VisData", ['resolution', 'midpoint', 'size', 'vdist'], ve
 SPATIAL_DATA = namedtuple("SpacialData", ['ecc', 'sf', 'rot'])
 FREQ_DATA = namedtuple("FreqData", ['pixels_per_degree', 'gabor_diameter', 'xf', 'yf', 'guassian', 'ramp', 'grating', 'g'])
 
-GABOR_DEF = namedtuple("GaborDef", ['original', 'matrix', 'rms_matrix', 'avg_matrix'])
+GABOR_DEF = namedtuple("GaborDef", ['original', 'matrix', 'rms_matrix', 'avg_matrix', 'rms_measure'])
 
 GABOR_DATA = namedtuple("GaborData", ['position', 'size', 'radius', 'old_patch', 'new_patch'])
 
@@ -86,22 +86,35 @@ def load_matrices(source, resolution=(1024, 768), is_rms=False):
     s_image_mat = pygame.surfarray.array3d(s_image_original)
     s_image_rms_mat = s_image_mat.copy() if is_rms else color_rms(s_image_mat, 0.2)
     s_avg_mat = numpy.mean(s_image_rms_mat, axis=2)
-    return GABOR_DEF._make([s_image_original, s_image_mat, s_image_rms_mat, s_avg_mat])
+    
+    R = (s_avg_mat / 127.0) - 1
+    R = R / (numpy.max(numpy.abs(R))) / 2.0
+    rms_measure = numpy.std(R + 0.5) / numpy.mean(R + 0.5)
+    
+    return GABOR_DEF._make([s_image_original, s_image_mat, s_image_rms_mat, s_avg_mat, rms_measure])
 
 def load_spacial_data(
     (resolution, midpoint, size, vdist),
     (ecc, sf, orientation),
     sigma=0.5):
     
-    pixel_size = [x/y for x,y in zip(size, resolution)]
+    #pixel_size = [x/y for x,y in zip(size, resolution)] #stop using the list comp
+    pixel_size = size[0]/resolution[0]
+
+    #degrees_per_pixel = [2.0 * math.atan(size/(2.0*vdist)) * (180.0/math.pi) for size in pixel_size] #no list comp!
+    degrees_per_pixel = 2.0 * math.atan(pixel_size/(2.0*vdist)) * (180.0/math.pi)
+
+    #if degrees_per_pixel[0] != degrees_per_pixel[1]:
+    #    print "degrees_per_pixel is incorrect, both values should match.\nThe aspect ratio may not match the screen size. Exiting."
+    #    exit(0)
+    pixels_per_degree = round(1.0 / degrees_per_pixel) #partial pixels aren't needed here
     
-    degrees_per_pixel = [2.0 * math.atan(size/(2.0*vdist)) * (180.0/math.pi) for size in pixel_size]
-    if degrees_per_pixel[0] != degrees_per_pixel[1]:
-        print "degrees_per_pixel is incorrect, both values should match.\nThe aspect ratio may not match the screen size. Exiting."
-        exit(0)
-    pixels_per_degree = round(1.0 / degrees_per_pixel[0]) #partial pixels aren't needed here
+    ecc = 3
+    patch_size = 154
     
-    gabor_diameter = round(pixels_per_degree)*ecc
+    gabor_diameter = patch_size
+    if gabor_diameter is None:
+            gabor_diameter = round(pixels_per_degree)*patch_ecc
     
     linear_spacing = numpy.linspace(-ecc/2.0, ecc/2.0, gabor_diameter + 1)
     [xf, yf] = numpy.meshgrid(linear_spacing, linear_spacing) #equivalent to doing meshgrid(linear_spacing) in matlab
@@ -109,51 +122,47 @@ def load_spacial_data(
     yf = yf[0:-1, 0:-1]
     #sigma = 0.5 #width of gaussian
     
-    mat_array = numpy.exp((-((xf ** 2) + (yf ** 2))) / (sigma ** 2)) #equation from aaron's code
-    gaussian = mat2gray(mat_array)
+    #mat_array = numpy.exp((-((xf ** 2) + (yf ** 2))) / (sigma ** 2)) #equation from aaron's code
+    #gaussian = mat2gray(mat_array) #can maybe remove mat2gray call
+    gaussian = numpy.exp((-((xf ** 2) + (yf ** 2))) / (sigma ** 2)) #equation from aaron's code
     
     ramp = numpy.sin(orientation * math.pi/180.0) * xf - numpy.cos(orientation * math.pi / 180.0) * yf
     grating = numpy.sin(2.0 * math.pi * sf * ramp)
     
     g = mat2gray(grating * gaussian)
 
-    return FREQ_DATA._make([pixels_per_degree, gabor_diameter, xf, yf, gaussian, ramp, grating, g])
+    return FREQ_DATA._make([pixels_per_degree, gabor_diameter, xf, yf, gaussian, ramp, grating, g]) #should split all this up a bit so it can be done in pieces and interlaced with other functionality
 
 def modulate_image(gabor_def,
                     visuals,
                     spacials,
                     position,
                     min_contrast=0.0,
-                    frequency_data=None):
+                    frequency_data=None,
+                    use_local_rms=False):
     
     (pixels_per_degree, gabor_diameter, xf, yf, gaussian, ramp, grating, g) = frequency_data if isinstance(frequency_data, FREQ_DATA) else load_spacial_data(visuals, spacials)
-    
+    import time
+    st = time.time()
     top_left_pos = (position[0] - (gabor_diameter / 2.0), position[1] - (gabor_diameter / 2.0))
-    #import time
-    #print " "
-    #s = time.time()
-    patch = gabor_def.rms_matrix[top_left_pos[0] : top_left_pos[0] + gabor_diameter, top_left_pos[1] : top_left_pos[1] + gabor_diameter, :]
-    #print "a " + str((time.time() - s) * 1000.0)
-    #s = time.time()
     
-    patch_avg = gabor_def.avg_matrix[top_left_pos[0] : top_left_pos[0] + gabor_diameter, top_left_pos[1] : top_left_pos[1] + gabor_diameter]
-    #patch_avg = numpy.mean(patch, axis=2)
-    #print "x = {0}".format(patch_avg)
-    #patch_avg = patch[:,:,1]
-    #print "b " + str((time.time() - s) * 1000.0)
-    #s = time.time()
-    R = (patch_avg / 127.0) - 1
-    R = R / (numpy.max(numpy.abs(R))) / 2.0
-    #print "c " + str((time.time() - s) * 1000.0)
-    #s = time.time()
-    rms_measure = numpy.std(R + 0.5) / numpy.mean(R + 0.5)
-    if min_contrast > 0:
-        rms_measure = max(rms_measure, min_contrast)
-    #print "d " + str((time.time() - s) * 1000.0)
-    g = g * (255.0 * rms_measure)
+    patch = gabor_def.rms_matrix[top_left_pos[0] : top_left_pos[0] + gabor_diameter, top_left_pos[1] : top_left_pos[1] + gabor_diameter, :]
+    
+    if use_local_rms:
+        patch_avg = gabor_def.avg_matrix[top_left_pos[0] : top_left_pos[0] + gabor_diameter, top_left_pos[1] : top_left_pos[1] + gabor_diameter]
+        R = (patch_avg / 127.0) - 1
+        R = R / (numpy.max(numpy.abs(R))) / 2.0
+        rms_measure = numpy.std(R + 0.5) / numpy.mean(R + 0.5)
+        print rms_measure
+        if min_contrast > 0:
+            rms_measure = max(rms_measure, min_contrast)
+        g = g * (255.0 * rms_measure)
+    else:
+        g = g * (255.0 * gabor_def.rms_measure)
+    
     g = g - numpy.mean(g)
     
     gabor = numpy.transpose(numpy.tile(g, (3,1,1)), (1,2,0))
-    
+    print "took {0}".format((time.time() - st) * 1000.0)
     return GABOR_DATA._make([top_left_pos, gabor_diameter, gabor_diameter / 2.0, patch, numpy.clip(patch + gabor, 0, 255).astype('uint8')])
     
